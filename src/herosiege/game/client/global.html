@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hero Siege - Global Viewer</title>
+    <style>
+      body { margin: 0; background: #0d0a14; color: #e8d8b0; font-family: monospace; }
+      #hud { padding: 8px 12px; font-size: 14px; }
+      canvas { display: block; margin: 0 auto; background: #161020; image-rendering: pixelated; }
+      .win { color: #7fe07f; }
+      .loss { color: #e06f6f; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">Hero Siege</div>
+    <canvas id="view" width="720" height="720"></canvas>
+    <script>
+      const COLORS = {
+        wall: "#2a2238", floor: "#161020", sanctum: "#f5c542", portal: "#a23bd6",
+        arcane_forge: "#4aa3ff", healing_spring: "#3be08a", gold_shrine: "#f5c542",
+        hero: "#e8e0c0", skeleton: "#cfd3d6", imp: "#ff7a4a", hellhound: "#b0581f", demon: "#d6334d",
+      };
+      const canvas = document.getElementById("view");
+      const ctx = canvas.getContext("2d");
+      const hud = document.getElementById("hud");
+      function draw(s) {
+        const cell = Math.floor(Math.min(canvas.width / s.width, canvas.height / s.height));
+        ctx.fillStyle = COLORS.floor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = COLORS.wall;
+        for (let x = 0; x < s.width; x++) { ctx.fillRect(x * cell, 0, cell, cell); ctx.fillRect(x * cell, (s.height - 1) * cell, cell, cell); }
+        for (let y = 0; y < s.height; y++) { ctx.fillRect(0, y * cell, cell, cell); ctx.fillRect((s.width - 1) * cell, y * cell, cell, cell); }
+        const tile = (o, c) => { ctx.fillStyle = c; ctx.fillRect(o.x * cell, o.y * cell, cell, cell); };
+        for (const p of s.portals) tile(p, COLORS.portal);
+        for (const sh of s.shrines) tile(sh, COLORS[sh.kind] || "#888");
+        tile(s.sanctum, COLORS.sanctum);
+        for (const m of s.monsters) tile(m, COLORS[m.kind] || "#fff");
+        for (const h of s.heroes) if (h.alive) tile(h, COLORS.hero);
+        const cls = s.outcome === "win" ? "win" : s.outcome ? "loss" : "";
+        hud.innerHTML = `Wave ${s.wave}/${s.num_waves} &nbsp; Sanctum ${s.sanctum.hp}/${s.sanctum.max_hp} &nbsp; Slain ${s.monsters_slain} &nbsp; <span class="${cls}">${s.outcome || "in progress"}</span>`;
+      }
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/global`);
+      ws.onmessage = (e) => draw(JSON.parse(e.data));
+    </script>
+  </body>
+</html>

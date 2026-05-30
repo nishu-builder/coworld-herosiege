@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "herosiege"
+version = "0.1.0"
+description = "Hero Siege - a high-fantasy ARPG siege-survival Coworld game"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.34.0",
+  "websockets>=15.0.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["herosiege", "herosiege.*"]
+
+[tool.setuptools.package-data]
+herosiege = ["game/client/*.html", "game/docs/*.md", "art/*.png"]

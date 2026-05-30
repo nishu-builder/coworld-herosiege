@@ -1,0 +1,134 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Metta-AI/coworld/main/src/coworld/coworld_manifest_schema.json",
+  "game": {
+    "name": "herosiege",
+    "description": "High-fantasy ARPG siege: heroes defend the central Sanctum (Eternal Flame) from escalating monster hordes pouring out of the edge Demon Portals, earning gold and essence to upgrade at arcane shrines.",
+    "owner": "nishu.builder@gmail.com",
+    "runnable": {
+      "type": "game",
+      "image": "{{HEROSIEGE_IMAGE}}",
+      "run": ["python", "-m", "herosiege.game.server"]
+    },
+    "config_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokens", "players", "width", "height", "max_ticks", "tick_rate", "num_waves", "player_connect_timeout"],
+      "properties": {
+        "tokens": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "players": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": { "name": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "width": { "type": "integer", "minimum": 12, "maximum": 48 },
+        "height": { "type": "integer", "minimum": 12, "maximum": 48 },
+        "max_ticks": { "type": "integer", "minimum": 1, "maximum": 20000 },
+        "tick_rate": { "type": "number", "exclusiveMinimum": 0, "maximum": 60 },
+        "num_waves": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "player_connect_timeout": { "type": "number", "minimum": 0, "maximum": 600 }
+      }
+    },
+    "results_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scores", "waves_survived", "monsters_slain", "ticks"],
+      "properties": {
+        "scores": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "number" }
+        },
+        "waves_survived": { "type": "integer", "minimum": 0 },
+        "monsters_slain": { "type": "integer", "minimum": 0 },
+        "ticks": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "protocols": {
+      "player": {
+        "type": "uri",
+        "value": "https://github.com/nishu-builder/coworld-herosiege/blob/main/src/herosiege/game/docs/player_protocol_spec.md"
+      },
+      "global": {
+        "type": "uri",
+        "value": "https://github.com/nishu-builder/coworld-herosiege/blob/main/src/herosiege/game/docs/global_protocol_spec.md"
+      }
+    },
+    "docs": {
+      "pages": [
+        {
+          "id": "rules.md",
+          "title": "rules.md",
+          "content": {
+            "type": "text",
+            "value": "# Hero Siege Rules\n\nHeroes spawn around the central Sanctum (the Eternal Flame) and must defend it. Monster hordes (Skeletons, Imps, Hellhounds, Demons) pour in waves from the four Demon Portals at the arena edges and march toward the Sanctum. A monster that reaches the Sanctum damages it and is consumed; when the Sanctum falls, the heroes lose. Heroes move one cell per tick and attack an adjacent monster by bumping into it, earning gold and essence from kills. Spend resources at shrines (step adjacent and interact): the Arcane Forge raises attack damage, the Healing Spring restores health, and the Gold Shrine converts essence into gold. Survive every wave with the Sanctum intact to win. Any hero slot with no connected player is run by a built-in melee AI."
+          }
+        },
+        {
+          "id": "play_herosiege.md",
+          "title": "play_herosiege.md",
+          "content": {
+            "type": "uri",
+            "value": "https://github.com/nishu-builder/coworld-herosiege/blob/main/README.md"
+          }
+        }
+      ]
+    }
+  },
+  "player": [
+    {
+      "id": "champion",
+      "name": "Champion",
+      "type": "player",
+      "image": "{{HEROSIEGE_IMAGE}}",
+      "run": ["python", "-m", "herosiege.player.player"],
+      "description": "Scripted hero that charges the nearest monster, defending the Sanctum in melee."
+    }
+  ],
+  "commissioner": [],
+  "reporter": [],
+  "grader": [],
+  "diagnoser": [],
+  "optimizer": [],
+  "variants": [
+    {
+      "id": "default",
+      "name": "Default Siege",
+      "game_config": {
+        "width": 24,
+        "height": 24,
+        "max_ticks": 4000,
+        "tick_rate": 10,
+        "num_waves": 6,
+        "player_connect_timeout": 60,
+        "players": [{ "name": "Hero 1" }, { "name": "Hero 2" }]
+      },
+      "description": "Two heroes defend the Sanctum across six escalating waves on a 24x24 arena."
+    }
+  ],
+  "certification": {
+    "game_config": {
+      "width": 20,
+      "height": 20,
+      "max_ticks": 1500,
+      "tick_rate": 50,
+      "num_waves": 2,
+      "player_connect_timeout": 30,
+      "players": [{ "name": "Hero 1" }, { "name": "Hero 2" }]
+    },
+    "players": [{ "player_id": "champion" }, { "player_id": "champion" }]
+  }
+}

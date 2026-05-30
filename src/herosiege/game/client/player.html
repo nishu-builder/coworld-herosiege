@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hero Siege - Player</title>
+    <style>
+      body { margin: 0; background: #0d0a14; color: #e8d8b0; font-family: monospace; }
+      #hud { padding: 8px 12px; font-size: 14px; }
+      canvas { display: block; margin: 0 auto; background: #161020; image-rendering: pixelated; }
+      #help { text-align: center; font-size: 12px; padding: 6px; color: #9a8fb0; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">Hero Siege - connecting...</div>
+    <canvas id="view" width="720" height="720"></canvas>
+    <div id="help">Arrow keys / WASD to move &bull; Space to use an adjacent shrine</div>
+    <script>
+      // name -> sprite file under /art. Drop a new PNG here (e.g. Replicate output)
+      // and add/replace an entry to reskin without touching the engine or server.
+      const SPRITES = {
+        hero: "hero_knight.png",
+        skeleton: "monster_skeleton.png",
+        demon: "monster_demon.png",
+        sanctum: "sanctum.png",
+        portal: "demon_portal.png",
+        arcane_forge: "gold_shrine.png",
+        healing_spring: "gold_shrine.png",
+        gold_shrine: "gold_shrine.png",
+      };
+      const COLORS = {
+        wall: "#2a2238", floor: "#161020", sanctum: "#f5c542", portal: "#a23bd6",
+        arcane_forge: "#4aa3ff", healing_spring: "#3be08a", gold_shrine: "#f5c542",
+        hero: "#e8e0c0", self: "#fff7d0", skeleton: "#cfd3d6", imp: "#ff7a4a", hellhound: "#b0581f", demon: "#d6334d",
+      };
+      const IMAGES = {};
+      for (const [key, file] of Object.entries(SPRITES)) {
+        const img = new Image();
+        img.src = `/art/${file}`;
+        IMAGES[key] = img;
+      }
+      const params = new URLSearchParams(location.search);
+      const slot = params.get("slot");
+      const token = params.get("token");
+      const canvas = document.getElementById("view");
+      const ctx = canvas.getContext("2d");
+      const hud = document.getElementById("hud");
+      let mySlot = slot === null ? -1 : parseInt(slot, 10);
+      function cellAt(o, cell, key, color, ring) {
+        const img = IMAGES[key];
+        if (img && img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, o.x * cell, o.y * cell, cell, cell);
+        } else {
+          ctx.fillStyle = color || "#fff";
+          ctx.fillRect(o.x * cell, o.y * cell, cell, cell);
+        }
+        if (ring) {
+          ctx.strokeStyle = ring;
+          ctx.lineWidth = 2;
+          ctx.strokeRect(o.x * cell + 1, o.y * cell + 1, cell - 2, cell - 2);
+        }
+      }
+      function draw(s) {
+        if (typeof s.slot === "number") mySlot = s.slot;
+        const cell = Math.floor(Math.min(canvas.width / s.width, canvas.height / s.height));
+        ctx.fillStyle = COLORS.floor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = COLORS.wall;
+        for (let x = 0; x < s.width; x++) { ctx.fillRect(x * cell, 0, cell, cell); ctx.fillRect(x * cell, (s.height - 1) * cell, cell, cell); }
+        for (let y = 0; y < s.height; y++) { ctx.fillRect(0, y * cell, cell, cell); ctx.fillRect((s.width - 1) * cell, y * cell, cell, cell); }
+        for (const p of s.portals) cellAt(p, cell, "portal", COLORS.portal);
+        for (const sh of s.shrines) cellAt(sh, cell, sh.kind, COLORS[sh.kind]);
+        cellAt(s.sanctum, cell, "sanctum", COLORS.sanctum);
+        for (const m of s.monsters) cellAt(m, cell, m.kind, COLORS[m.kind]);
+        s.heroes.forEach((h, i) => { if (h.alive) cellAt(h, cell, "hero", COLORS.hero, i === mySlot ? COLORS.self : null); });
+        const me = s.heroes[mySlot];
+        const stats = me ? `HP ${me.hp}/${me.max_hp} Gold ${me.gold} Essence ${me.essence} Kills ${me.kills}` : "spectating";
+        hud.textContent = `Wave ${s.wave}/${s.num_waves} - ${stats} - ${s.outcome || "in progress"}`;
+      }
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const ws = new WebSocket(`${proto}://${location.host}/player?slot=${slot}&token=${token}`);
+      ws.onmessage = (e) => draw(JSON.parse(e.data));
+      const KEYS = {
+        ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+        w: "up", s: "down", a: "left", d: "right",
+      };
+      document.addEventListener("keydown", (e) => {
+        if (ws.readyState !== WebSocket.OPEN) return;
+        if (e.key === " ") { ws.send(JSON.stringify({ interact: true })); return; }
+        const move = KEYS[e.key];
+        if (move) { e.preventDefault(); ws.send(JSON.stringify({ move })); }
+      });
+    </script>
+  </body>
+</html>

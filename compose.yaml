@@ -1,0 +1,6 @@
+services:
+  herosiege:
+    image: herosiege-game:latest
+    platform: linux/amd64
+    build:
+      context: .
