@@ -6,6 +6,7 @@ import os
 from typing import Any, cast
 
 import websockets
+from websockets.exceptions import ConnectionClosed
 
 
 def _dist(ax: int, ay: int, bx: int, by: int) -> int:
@@ -41,12 +42,15 @@ def _champion_move(obs: dict[str, Any], slot: int) -> dict[str, str]:
 async def main() -> None:
     url = os.environ["COWORLD_PLAYER_WS_URL"]
     async with websockets.connect(url) as websocket:
-        async for raw_message in websocket:
-            message = cast(dict[str, Any], json.loads(raw_message))
-            if message.get("type") == "final" or message.get("done"):
-                return
-            if message.get("type") == "observation":
-                await websocket.send(json.dumps(_champion_move(message, message["slot"])))
+        try:
+            async for raw_message in websocket:
+                message = cast(dict[str, Any], json.loads(raw_message))
+                if message.get("type") == "final" or message.get("done"):
+                    return
+                if message.get("type") == "observation":
+                    await websocket.send(json.dumps(_champion_move(message, message["slot"])))
+        except ConnectionClosed:
+            return
 
 
 if __name__ == "__main__":
