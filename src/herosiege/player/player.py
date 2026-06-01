@@ -8,35 +8,53 @@ from typing import Any, cast
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+FORGE_COST = 20
+SPRING_COST = 15
+CARDINALS = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
+
 
 def _dist(ax: int, ay: int, bx: int, by: int) -> int:
     return max(abs(ax - bx), abs(ay - by))
 
 
-def _sign(value: int) -> int:
-    return (value > 0) - (value < 0)
+def _passable(obs: dict[str, Any], x: int, y: int) -> bool:
+    if x <= 0 or y <= 0 or x >= obs["width"] - 1 or y >= obs["height"] - 1:
+        return False
+    if x == obs["sanctum"]["x"] and y == obs["sanctum"]["y"]:
+        return False
+    return not any(p["x"] == x and p["y"] == y for p in obs["portals"])
 
 
-def _nearest_monster(obs: dict[str, Any], hero: dict[str, Any]) -> dict[str, Any] | None:
-    best: dict[str, Any] | None = None
-    best_d = 1 << 30
-    for m in obs["monsters"]:
-        d = _dist(hero["x"], hero["y"], m["x"], m["y"])
-        if d < best_d:
-            best_d, best = d, m
-    return best
-
-
-def _champion_move(obs: dict[str, Any], slot: int) -> dict[str, str]:
+def _hero_step(obs: dict[str, Any], slot: int, gx: int, gy: int) -> str:
     hero = obs["heroes"][slot]
-    target = _nearest_monster(obs, hero)
-    goal = target if target is not None else obs["sanctum"]
-    dx, dy = _sign(goal["x"] - hero["x"]), _sign(goal["y"] - hero["y"])
-    if abs(goal["x"] - hero["x"]) >= abs(goal["y"] - hero["y"]):
-        move = "right" if dx > 0 else "left" if dx < 0 else ("down" if dy > 0 else "up")
-    else:
-        move = "down" if dy > 0 else "up" if dy < 0 else ("right" if dx > 0 else "left")
-    return {"move": move}
+    monsters = {(m["x"], m["y"]) for m in obs["monsters"]}
+    others = {(h["x"], h["y"]) for i, h in enumerate(obs["heroes"]) if i != slot and h["alive"]}
+    best_move = "stay"
+    best_key: tuple[int, int] | None = None
+    for move, (cx, cy) in CARDINALS.items():
+        nx, ny = hero["x"] + cx, hero["y"] + cy
+        attack = (nx, ny) in monsters
+        if not attack and (not _passable(obs, nx, ny) or (nx, ny) in others):
+            continue
+        key = (0 if attack else 1, _dist(nx, ny, gx, gy))
+        if best_key is None or key < best_key:
+            best_key, best_move = key, move
+    return best_move
+
+
+def _champion_move(obs: dict[str, Any], slot: int) -> dict[str, Any]:
+    hero = obs["heroes"][slot]
+    monsters = obs["monsters"]
+    for shrine in obs["shrines"]:
+        if _dist(hero["x"], hero["y"], shrine["x"], shrine["y"]) > 1:
+            continue
+        if shrine["kind"] == "healing_spring" and hero["hp"] <= hero["max_hp"] // 2 and hero["gold"] >= SPRING_COST:
+            return {"interact": True}
+        if shrine["kind"] == "arcane_forge" and hero["gold"] >= FORGE_COST and not monsters:
+            return {"interact": True}
+    sanctum = obs["sanctum"]
+    goal = min(monsters, key=lambda m: _dist(m["x"], m["y"], sanctum["x"], sanctum["y"])) if monsters else sanctum
+    return {"move": _hero_step(obs, slot, goal["x"], goal["y"])}
 
 
 async def main() -> None:

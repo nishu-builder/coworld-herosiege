@@ -13,32 +13,35 @@ DIRECTIONS: dict[str, tuple[int, int]] = {
 }
 
 MONSTER_STATS: dict[str, dict[str, int]] = {
-    "skeleton": {"hp": 12, "damage": 3, "speed": 1, "gold": 5, "essence": 1},
-    "imp": {"hp": 8, "damage": 4, "speed": 1, "gold": 6, "essence": 1},
-    "hellhound": {"hp": 20, "damage": 6, "speed": 1, "gold": 9, "essence": 2},
-    "demon": {"hp": 48, "damage": 11, "speed": 2, "gold": 22, "essence": 4},
+    "skeleton": {"hp": 12, "damage": 2, "speed": 3, "gold": 5, "essence": 1},
+    "imp": {"hp": 8, "damage": 2, "speed": 3, "gold": 6, "essence": 1},
+    "hellhound": {"hp": 20, "damage": 3, "speed": 2, "gold": 9, "essence": 2},
+    "demon": {"hp": 48, "damage": 5, "speed": 3, "gold": 22, "essence": 4},
 }
 
 SHRINE_KINDS = ("arcane_forge", "healing_spring", "gold_shrine")
 
 FORGE_COST = 20
 SPRING_COST = 15
-SANCTUM_HP = 240
-HERO_HP = 55
-HERO_DAMAGE = 9
+SPRING_HEAL = 60
+SANCTUM_HP = 1400
+HERO_HP = 220
+HERO_DAMAGE = 15
 AGGRO_RADIUS = 6
-SPAWN_INTERVAL = 3
-WAVE_BREAK = 22
+SPAWN_INTERVAL = 7
+WAVE_BREAK = 70
+WAVE_BASE = 2
+WAVE_GROW = 1
 
 
 @dataclass
 class HeroSiegeConfig:
-    width: int = 24
-    height: int = 24
-    max_ticks: int = 4000
-    tick_rate: float = 10.0
+    width: int = 22
+    height: int = 22
+    max_ticks: int = 12000
+    tick_rate: float = 6.0
     num_heroes: int = 2
-    num_waves: int = 6
+    num_waves: int = 10
     seed: int = 0
 
 
@@ -130,7 +133,7 @@ class HeroSiege:
 
     def _start_wave(self) -> None:
         self.wave += 1
-        self.wave_size = 4 + self.wave * 3
+        self.wave_size = WAVE_BASE + self.wave * WAVE_GROW
         self.spawned_this_wave = 0
         self.spawn_cooldown = 0
         self.between_waves = 0
@@ -151,9 +154,7 @@ class HeroSiege:
     def _is_structure(self, x: int, y: int) -> bool:
         if x == self.sanctum_x and y == self.sanctum_y:
             return True
-        if any(p.x == x and p.y == y for p in self.portals):
-            return True
-        return any(s.x == x and s.y == y for s in self.shrines)
+        return any(p.x == x and p.y == y for p in self.portals)
 
     def _monster_at(self, x: int, y: int) -> Monster | None:
         for m in self.monsters:
@@ -169,17 +170,6 @@ class HeroSiege:
 
     def _passable(self, x: int, y: int) -> bool:
         return not self._is_wall(x, y) and not self._is_structure(x, y)
-
-    def _nearest_monster(self, hero: Hero) -> Monster | None:
-        best: Monster | None = None
-        best_d = 1 << 30
-        for m in self.monsters:
-            if not m.alive:
-                continue
-            d = _dist(hero.x, hero.y, m.x, m.y)
-            if d < best_d:
-                best_d, best = d, m
-        return best
 
     def _nearest_hero(self, x: int, y: int) -> Hero | None:
         best: Hero | None = None
@@ -206,7 +196,7 @@ class HeroSiege:
         elif shrine.kind == "healing_spring":
             if hero.gold >= SPRING_COST and hero.hp < hero.max_hp:
                 hero.gold -= SPRING_COST
-                hero.hp = min(hero.max_hp, hero.hp + 20)
+                hero.hp = min(hero.max_hp, hero.hp + SPRING_HEAL)
         elif shrine.kind == "gold_shrine":
             if hero.essence >= 1:
                 hero.essence -= 1
@@ -231,21 +221,33 @@ class HeroSiege:
                 return nx, ny
         return None
 
+    def _hero_step(self, hero: Hero, gx: int, gy: int) -> str:
+        best_move = "stay"
+        best_key: tuple[int, int] | None = None
+        for move, (cx, cy) in DIRECTIONS.items():
+            if cx == 0 and cy == 0:
+                continue
+            nx, ny = hero.x + cx, hero.y + cy
+            attack = self._monster_at(nx, ny) is not None
+            if not attack and (not self._passable(nx, ny) or self._hero_at(nx, ny) is not None):
+                continue
+            key = (0 if attack else 1, _dist(nx, ny, gx, gy))
+            if best_key is None or key < best_key:
+                best_key, best_move = key, move
+        return best_move
+
     def default_hero_action(self, hero: Hero) -> dict[str, Any]:
         shrine = self._shrine_adjacent(hero)
         if shrine is not None:
             if shrine.kind == "healing_spring" and hero.hp <= hero.max_hp // 2 and hero.gold >= SPRING_COST:
                 return {"interact": True}
-            if shrine.kind == "arcane_forge" and hero.gold >= FORGE_COST and self._nearest_monster(hero) is None:
+            if shrine.kind == "arcane_forge" and hero.gold >= FORGE_COST and not self.monsters:
                 return {"interact": True}
-        target = self._nearest_monster(hero)
-        goal_x, goal_y = (target.x, target.y) if target is not None else (self.sanctum_x, self.sanctum_y)
-        dx, dy = _sign(goal_x - hero.x), _sign(goal_y - hero.y)
-        if abs(goal_x - hero.x) >= abs(goal_y - hero.y):
-            move = "right" if dx > 0 else "left" if dx < 0 else ("down" if dy > 0 else "up")
-        else:
-            move = "down" if dy > 0 else "up" if dy < 0 else ("right" if dx > 0 else "left")
-        return {"move": move}
+        threats = [m for m in self.monsters if m.alive]
+        if threats:
+            target = min(threats, key=lambda m: _dist(m.x, m.y, self.sanctum_x, self.sanctum_y))
+            return {"move": self._hero_step(hero, target.x, target.y)}
+        return {"move": self._hero_step(hero, self.sanctum_x, self.sanctum_y)}
 
     def _act_hero(self, hero: Hero, action: dict[str, Any] | None) -> None:
         if action is None:

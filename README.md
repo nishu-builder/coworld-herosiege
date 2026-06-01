@@ -65,12 +65,24 @@ coworld build compose.yaml coworld_manifest_template.json 0.1.0 tmp/coworld_mani
 # 2. Certify: run the game + bundled Champion bots end to end, validate results and replay.
 coworld certify tmp/coworld_manifest.json
 
-# 3. Play in the browser. Prints a global viewer link and one player link per hero slot.
-coworld play tmp/coworld_manifest.json
+# 3. Play in the browser. Use the long, human-paced "default" variant (10 waves, ~6 ticks/sec).
+coworld play tmp/coworld_manifest.json --variant default
 ```
 
-In `coworld play`, drive a hero with the arrow keys / WASD and use an adjacent shrine with space. Any
-slot you do not open is played by the AI.
+`--variant default` is the variant to play: ten escalating waves on a 28x28 arena, paced for a human.
+(Without it, `play` falls back to the short, fast `certification` fixture meant for CI - ~30 seconds.)
+
+Open a **player link** for the hero you want to control and the **global link** to watch the whole
+arena. Controls:
+
+- Arrow keys / WASD set your hero's heading; it keeps moving that way until you press another key, so
+  you steer rather than tap once per step.
+- `.` (or Enter) halts in place; Space uses a shrine when you are standing next to one.
+- Move into a monster to attack it. Any hero slot you do not open is run by the built-in AI.
+
+Read the bars: green = hero HP, red = monster HP, gold = the Sanctum. The HUD shows the wave, Sanctum
+HP, kills, and gold. Spend gold at the **Arcane Forge** (+damage) and **Healing Spring** (heal), and
+turn essence into gold at the **Gold Shrine**.
 
 ## Player protocol
 

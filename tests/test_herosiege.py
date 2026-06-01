@@ -49,9 +49,26 @@ def test_player_action_overrides_default_ai() -> None:
     assert (hero.x, hero.y) == (start[0], start[1] - 1)
 
 
+def _obs(hero: dict, monsters: list, shrines: list) -> dict:
+    return {
+        "width": 22,
+        "height": 22,
+        "sanctum": {"x": 11, "y": 11},
+        "portals": [],
+        "shrines": shrines,
+        "monsters": monsters,
+        "heroes": [hero],
+    }
+
+
 def test_champion_bot_returns_valid_action() -> None:
-    obs = {"heroes": [{"x": 9, "y": 11}], "sanctum": {"x": 10, "y": 10}, "monsters": [{"x": 9, "y": 9}]}
-    assert _champion_move(obs, 0)["move"] in {"up", "down", "left", "right", "stay"}
+    hero = {"x": 9, "y": 13, "hp": 220, "max_hp": 220, "gold": 0, "alive": True}
+    obs = _obs(hero, [{"x": 9, "y": 9}], [])
+    assert _champion_move(obs, 0)["move"] in {"up", "down", "left", "right"}
+
+    forge = {"x": 9, "y": 13, "kind": "arcane_forge"}
+    rich = {"x": 9, "y": 13, "hp": 220, "max_hp": 220, "gold": 50, "alive": True}
+    assert _champion_move(_obs(rich, [], [forge]), 0) == {"interact": True}
 
 
 def test_manifest_template_shape() -> None:

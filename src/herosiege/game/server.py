@@ -92,7 +92,8 @@ class Session:
         self.config, self.tokens, self.names, self.connect_timeout = load_config()
         self.game = HeroSiege(self.config)
         self.players: dict[int, WebSocket] = {}
-        self.actions: list[dict[str, Any] | None] = [None] * len(self.tokens)
+        self.moves: list[str | None] = [None] * len(self.tokens)
+        self.interacts: list[bool] = [False] * len(self.tokens)
         self.frames: list[dict[str, Any]] = []
         self.started = False
         self.done = False
@@ -186,16 +187,28 @@ async def player(websocket: WebSocket) -> None:
         asyncio.create_task(_play_game())
     try:
         async for message in websocket.iter_json():
-            session.actions[slot] = _parse_action(message)
+            if message.get("interact"):
+                session.interacts[slot] = True
+            else:
+                session.moves[slot] = str(message.get("move", "stay"))
     finally:
         if session.players.get(slot) is websocket:
             del session.players[slot]
+            session.moves[slot] = None
+            session.interacts[slot] = False
 
 
-def _parse_action(message: dict[str, Any]) -> dict[str, Any]:
-    if message.get("interact"):
-        return {"interact": True}
-    return {"move": str(message.get("move", "stay"))}
+def _tick_actions() -> list[dict[str, Any] | None]:
+    actions: list[dict[str, Any] | None] = []
+    for slot in range(len(session.tokens)):
+        if session.interacts[slot]:
+            actions.append({"interact": True})
+        elif session.moves[slot] is not None:
+            actions.append({"move": session.moves[slot]})
+        else:
+            actions.append(None)
+    session.interacts = [False] * len(session.tokens)
+    return actions
 
 
 async def _start_after_timeout() -> None:
@@ -211,12 +224,10 @@ async def _play_game() -> None:
         if session.paused:
             await asyncio.sleep(0.1)
             continue
-        session.game.step(session.actions)
-        session.actions = [None] * len(session.tokens)
-        snapshot = _snapshot()
-        session.frames.append(snapshot)
-        for ws in list(session.players.values()):
-            await ws.send_json(snapshot)
+        session.game.step(_tick_actions())
+        session.frames.append(_snapshot())
+        for slot, ws in list(session.players.items()):
+            await ws.send_json(_observation(slot))
         await asyncio.sleep(1.0 / session.tick_rate)
 
     results = session.game.results()

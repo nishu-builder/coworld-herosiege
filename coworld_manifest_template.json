@@ -108,15 +108,15 @@
       "id": "default",
       "name": "Default Siege",
       "game_config": {
-        "width": 24,
-        "height": 24,
-        "max_ticks": 4000,
-        "tick_rate": 10,
-        "num_waves": 6,
-        "player_connect_timeout": 60,
+        "width": 22,
+        "height": 22,
+        "max_ticks": 12000,
+        "tick_rate": 6,
+        "num_waves": 10,
+        "player_connect_timeout": 120,
         "players": [{ "name": "Hero 1" }, { "name": "Hero 2" }]
       },
-      "description": "Two heroes defend the Sanctum across six escalating waves on a 24x24 arena."
+      "description": "Two heroes defend the Sanctum across ten escalating waves on a 22x22 arena, paced for human play."
     }
   ],
   "certification": {
